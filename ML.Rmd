@@ -1,0 +1,137 @@
+---
+title: "Practical Machine Learning Project"
+output: html_document
+---
+
+###Synopsis
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular actiity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+###Loading Libraries  
+First, load the necessary R packages/libraries.
+
+```{r message=FALSE, warning=FALSE}
+library(AppliedPredictiveModeling)
+library(caret)
+library(rattle)
+library(rpart.plot)
+library(randomForest)
+```
+
+###Downloading Data Sets
+Next, download the data sets from the given URL.
+
+```{r}
+trainUrl <-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+trainFile <- "./data/pml-training.csv"
+testFile  <- "./data/pml-testing.csv"
+if (!file.exists("./data")) {
+  dir.create("./data")
+}
+if (!file.exists(trainFile)) {
+  download.file(trainUrl, destfile=trainFile, method="curl")
+}
+if (!file.exists(testFile)) {
+  download.file(testUrl, destfile=testFile, method="curl")
+}
+
+trainRaw <- read.csv("./data/pml-training.csv", na.strings=c("NA",""), header=TRUE)
+testRaw <- read.csv("./data/pml-testing.csv", na.strings=c("NA",""), header=TRUE)
+
+```
+
+###Analysis Data
+After downloading the data sets, verify that the training and testing data are identical.
+
+```{r}
+
+dim(trainRaw)
+dim(testRaw)
+
+colnames_train <- colnames(trainRaw)
+colnames_test <- colnames(testRaw)
+
+all.equal(colnames_train[1:length(colnames_train)-1], colnames_test[1:length(colnames_train)-1])
+```
+
+###Cleaning Up Data Sets
+Remove all the empty values and unnecessary columns to improve processing time. After all the unnecessary data has been removed, make sure that the training and testing data are identical.
+
+
+```{r}
+sum(complete.cases(trainRaw))
+
+trainRaw <- trainRaw[, colSums(is.na(trainRaw)) == 0] 
+testRaw <- testRaw[, colSums(is.na(testRaw)) == 0] 
+
+trainRaw <- trainRaw[,8:length(colnames(trainRaw))]
+testRaw <- testRaw[,8:length(colnames(testRaw))]
+
+dim(trainRaw)
+dim(testRaw)
+
+colnames_train <- colnames(trainRaw)
+colnames_test <- colnames(testRaw)
+
+all.equal(colnames_train[1:length(colnames_train)-1], colnames_test[1:length(colnames_train)-1])
+```
+
+###Preparing Training and Testing Data Sets
+Before running the algorithm, split the training data into 70% for training purpose and 30% for testing.
+
+```{r}
+set.seed(9788)
+inTrain <- createDataPartition(trainRaw$classe, p=0.70, list=F)
+trainData <- trainRaw[inTrain, ]
+testData <- trainRaw[-inTrain, ]
+```
+
+###Random Forest
+Random Forest has been proven to be accurate, therefore Random Forest is used for this project.
+
+```{r}
+RFControl <- trainControl(method="cv", 5)
+RFModel <- train(classe ~ ., data=trainData, method="rf", trControl=RFControl, ntree=250)
+print(RFModel, digits=4)
+
+RFPredict <- predict(RFModel, testData)
+print(confusionMatrix(testData$classe, RFPredict), digits=4)
+```
+
+##Calculate Performance for Random Forest
+After running the prediction, calculate the accuracy rate.
+
+```{r}
+print(postResample(RFPredict, testData$classe))
+```
+
+The difference is 0.25%.
+
+##Random Forest Preprocessing
+Let's run with the preprocessing option to compare the accuracy result.
+
+```{r}
+RFModel2 <- train(trainData$classe ~ ., method="rf", preProcess=c("center", "scale"), trControl=RFControl, data=trainData)
+print(RFModel2, digits=4)
+
+RFPredict2 <- predict(RFModel2, testData)
+print(confusionMatrix(testData$classe, RFPredict2), digits=4)
+
+print(postResample(RFPredict2, testData$classe))
+```
+
+The difference is 0.23%.
+
+###Predicting Model
+Finally run both prediction model against the test data set downloaded from the URL.
+
+```{r}
+result1 <- predict(RFModel, testRaw[, -length(names(testRaw))])
+result1
+
+result2 <- predict(RFModel2, testRaw[, -length(names(testRaw))])
+result2
+```
+
+###Conclusion
+Although there's a slight difference in the accuracy rates but the result against the testing data set is the same.
